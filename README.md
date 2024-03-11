@@ -7,6 +7,8 @@ vCard (.vcf) 文件解析转换为Excel文件
 
 # 感谢[光庆](http://chengxu.online/) 库函数搜索 V4.6.2 工具
 
+# 感谢[风行者](https://bbs.feiyeyu.com/forum.php) 的 npoi 扩展库。
+
 创作过程：
 
 # 我问：

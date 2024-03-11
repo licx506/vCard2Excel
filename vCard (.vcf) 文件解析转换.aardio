@@ -1,0 +1,140 @@
+import win.ui;
+import inet.url;
+import fsys.dlg;
+/*DSG{{*/
+var winform = win.form(text="aardio form";right=444;bottom=76)
+winform.add(
+button2={cls="button";text="保存";left=357;top=46;right=435;bottom=72;z=4};
+button_vCard={cls="button";text="选择vcf";left=357;top=15;right=435;bottom=41;z=2};
+edit_saveFile={cls="edit";left=13;top=46;right=351;bottom=72;edge=1;multiline=1;z=3};
+edit_vCard={cls="edit";text="";left=13;top=15;right=351;bottom=41;edge=1;multiline=1;z=1}
+)
+/*}}*/
+
+winform.button_vCard.oncommand = function(id,event){
+	var menu = fsys.dlg.open("*.vcf","请选择vCard (.vcf) 文件");
+	winform.edit_vCard.text = menu
+}
+
+// 变量定义
+var keylist = {}; //字段列表
+var contacts = {}; //联系人信息表
+var contact = {}; //联系人信息
+
+// 输入vCard (.vcf) 文件路径解析vCard内容
+var parseVCard = function(vCardfilePath){
+	import console;
+	//遍历每一行
+	for line in io.lines(vCardfilePath){
+		//去除首尾空白字符
+		line = string.trim(line)
+		//以 "BEGIN:VCARD" 开头，表示新的联系人信息开始，因此重置 contact 对象为一个新的空对象
+		if(string.startWith(line,"BEGIN:VCARD",true)){
+			contact = {};
+			console.log("新的联系人信息开始");
+		//以 "END:VCARD" 开头，表示当前联系人信息结束，将 contact 对象添加到 contacts 数组中	
+		}elseif(string.startWith(line,"END:VCARD",true)){
+			table.push(contacts,contact)
+			//console.varDump(contacts[1])
+			console.log("当前联系人信息结束");
+			//console.pause()
+		//解析其他行
+		}else {
+			parts = string.split(line,";");
+			if(#parts=1){ //处理扩展字段
+				var extendedFields = string.split(parts[1],":");
+				var key = extendedFields[1]
+				var value = extendedFields[2]
+				select(key) {
+				    case "VERSION" {console.log("版本："++value);}
+				    case "X-HW-VERSION" {console.log("华为内部版本："++value);}
+    				case "UID" {console.log("UID："++value);}
+    				case "BDAY"{ contact.BDAY = value}
+    				else {}	
+				}
+			}else { //处理其他字段
+				parts = table.unique(parts)
+            	key = string.trim(parts[1]);
+            	select(key) {
+				    case "N" { 
+						select(#parts-1) {
+				    		case 3 {
+				    		    var nameParts = string.split(parts[3],":");
+    		 					var name = string.replace(nameParts[2],"@=","%")
+                				contact.name =  inet.url.decode(name);
+				    		}
+				    		case 4 {
+				    		    nameParts = string.split(parts[3],":");
+				    		    var surname = string.replace(parts[4],"@=","%");
+    		 					name = string.replace(nameParts[2],"@=","%")
+                				contact.name =  inet.url.decode(name+surname);
+				    		}
+    						case 5 {
+    							var nameParts = string.split(parts[3],":");
+				    		    var surname1 = string.replace(parts[4],"@=","%");
+				    		    var surname2 = string.replace(parts[5],"@=","%");
+    		 					name = string.replace(nameParts[2],"@=","%")
+                				contact.name =  inet.url.decode(name+surname2+surname1);
+    						}
+    						else {}	
+						}	
+    				}
+    				case "FN" { 
+/*
+	 				var nameParts = string.split(parts[3],":");
+    		 		var name = string.replace(nameParts[2],"@=","%")
+                	contact.name =  inet.url.decode(name);
+*/
+    				}
+				    case "TEL" { 
+				        var phoneParts = string.split(parts[2], ":")
+				        //console.varDump(phoneParts)
+    		 			contact.phon = phoneParts[2]; 
+    				}
+    				case "EMAIL" {
+    				    var emailParts = string.split(parts[3], ":")
+						if(#emailParts=2){
+							contact.email = emailParts[2]; 
+						}
+    				}
+    				else {}	
+				}
+				
+			}
+			//console.varDump(contact)
+		}
+		
+	}
+//console.varDump(contacts)	
+io.close();
+return contacts;
+}
+
+// 导出为Excel格式
+var saveExcel = function(contacts){
+	import npoi;
+	workBook = npoi(winform.edit_saveFile.text) 
+	//创建工作表
+	sheet = workBook.sheet("通讯录")
+	sheet.setCellValue(1,1,{"姓名","电话","生日","email"})
+	//console.varDump(contacts)
+	for(i=1;#contacts;1){
+		if(contacts[i].email=null){
+		sheet.setCellValue(i+1,1,{contacts[i].name,contacts[i].phon,contacts[i].BDAY})	
+		}else {
+		sheet.setCellValue(i+1,1,{contacts[i].name,contacts[i].phon,contacts[i].BDAY})
+		sheet.setCellValue(i+1,4,contacts[i].email)
+		}	
+	}
+	workBook.save() //保存到文件	
+}
+
+winform.button2.oncommand = function(id,event){
+	menu = fsys.dlg.openDir("d:\","请选保存路径");
+	winform.edit_saveFile.text = menu + "\通讯录.xlsx"
+	contacts = parseVCard(winform.edit_vCard.text)
+	saveExcel(contacts)
+}
+
+winform.show();
+win.loopMessage();
